@@ -32,22 +32,42 @@ target_compile_definitions(native_sqlcipher PUBLIC
   
 )
 
-find_package(OpenSSL REQUIRED)
-
 set_target_properties(native_sqlcipher PROPERTIES
   CXX_STANDARD 11
   CXX_STANDARD_REQUIRED ON
 )
-target_include_directories(native_sqlcipher
-  PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}
-  PRIVATE
-    ${OPENSSL_INCLUDE_DIR}
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-target_link_libraries(native_sqlcipher PRIVATE OpenSSL::Crypto)
 
-if (ANDROID)
+if(ANDROID)
+  set(JNI_LIBS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../android/src/main/jniLibs)
+  add_library(crypto SHARED IMPORTED)
+  set_target_properties(crypto PROPERTIES
+    IMPORTED_LOCATION ${JNI_LIBS_DIR}/${ANDROID_ABI}/libcrypto.so)
+  
+  add_library(ssl SHARED IMPORTED)
+  set_target_properties(ssl PROPERTIES
+      IMPORTED_LOCATION ${JNI_LIBS_DIR}/${ANDROID_ABI}/libssl.so)
+      
+  target_link_libraries(native_sqlcipher PRIVATE crypto ssl)
+  target_include_directories(native_sqlcipher
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
+      ${CMAKE_CURRENT_SOURCE_DIR}/android/include
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
+  find_library(log-lib log)
+  target_link_libraries(native_sqlcipher PRIVATE ${log-lib})
+
   # Support Android 15 16k page size
   target_link_options(native_sqlcipher PRIVATE "-Wl,-z,max-page-size=16384")
+else()
+  find_package(OpenSSL REQUIRED)
+  target_link_libraries(native_sqlcipher PRIVATE OpenSSL::Crypto)
+  target_include_directories(native_sqlcipher
+    PUBLIC
+      ${CMAKE_CURRENT_SOURCE_DIR}
+    PRIVATE
+      ${OPENSSL_INCLUDE_DIR}
+      ${CMAKE_CURRENT_SOURCE_DIR}/include
+  )
 endif()
